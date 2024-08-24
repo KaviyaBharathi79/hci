@@ -9,13 +9,12 @@
         <div class="left-side">
             <div class="result">
                 <p>Result: <span id="result">{{ pred }}</span></p>
-                <p>Autocorrect: <span id="autocorrect">{{ predicted_output }}</span></p>
             </div>
             <div class="language-options">
                 <h3>Select Language:</h3>
                 <form id="language-form" action="/set_language" method="post">
                     <select name="language" id="language" onchange="submitLanguageForm()">
-                        <option value="en" {% if language == 'en' %}selected{% endif %}>English</option>
+                        
                         <option value="af" {% if language == 'af' %}selected{% endif %}>Afrikaans</option>
     <option value="sq" {% if language == 'sq' %}selected{% endif %}>Albanian</option>
     <option value="am" {% if language == 'am' %}selected{% endif %}>Amharic</option>
@@ -37,7 +36,7 @@
     <option value="cs" {% if language == 'cs' %}selected{% endif %}>Czech</option>
     <option value="da" {% if language == 'da' %}selected{% endif %}>Danish</option>
     <option value="nl" {% if language == 'nl' %}selected{% endif %}>Dutch</option>
-    
+    <option value="en" {% if language == 'en' %}selected{% endif %}>English</option>
     <option value="eo" {% if language == 'eo' %}selected{% endif %}>Esperanto</option>
     <option value="et" {% if language == 'et' %}selected{% endif %}>Estonian</option>
     <option value="tl" {% if language == 'tl' %}selected{% endif %}>Filipino</option>
@@ -141,24 +140,12 @@
                 </form>
             </div>
         </div>
-        <div class="right-side">
-            <h3>Suggestions</h3>
-            <ul id="suggestions-list">
-                {% if similar_words %}
-                    {% for suggestion in similar_words %}
-                        <li>{{ suggestion['Word'] }} (Similarity: {{ suggestion['Similarity'] }})</li>
-                    {% endfor %}
-                {% else %}
-                    <li>No suggestions available</li>
-                {% endif %}
-            </ul>
-        </div>
     </div>
     <div class="container">
-        <form action='/predict' method='post'>
+        <form id="start-form" action='/predict' method='post'>
             <button type="submit" name="start" value="start" class="button1" id="startButton">Start</button>
         </form>
-        <form action='/stop' method='post'>
+        <form id="stop-form" action='/stop' method='post'>
             <button type="submit" name="stop" value="stop" class="button2" id="stop-button">Stop</button>
         </form>
     </div>
@@ -174,23 +161,23 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             const startButton = document.getElementById('startButton');
-        
+            const stopButton = document.getElementById('stop-button');
+            const resultElement = document.getElementById('result');
+            const suggestionsList = document.querySelector('.right-side ul');
+
             startButton.addEventListener('click', function (e) {
                 e.preventDefault();
-        
+
                 fetch('/predict', {
                     method: 'POST',
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById('result').innerText = data.pred;
-                        document.getElementById('autocorrect').innerText = data.autocorrect;
-                        
-                        const suggestionsList = document.querySelector('.right-side ul');
-                        suggestionsList.innerHTML = '';  // Clear existing suggestions
-                        
-                        if (data.similar_words.length > 0) {
+                        resultElement.innerText = data.pred;
+
+                        suggestionsList.innerHTML = ''; // Clear existing suggestions
+                        if (data.similar_words && data.similar_words.length > 0) {
                             data.similar_words.forEach(suggestion => {
                                 const listItem = document.createElement('li');
                                 listItem.textContent = `${suggestion.Word} (Similarity: ${suggestion.Similarity})`;
@@ -205,12 +192,40 @@
                 })
                 .catch(error => console.error('Error:', error));
             });
+
+            stopButton.addEventListener('click', function (e) {
+                e.preventDefault();
+
+                fetch('/stop', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        resultElement.innerText = data.pred;  // This should be empty after stopping
+                        clearResultAndSuggestions();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
+
+            function performTextToSpeech(text) {
+                if ('speechSynthesis' in window && text.trim() !== '') {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+
+            function clearResultAndSuggestions() {
+                resultElement.innerText = '';
+                suggestionsList.innerHTML = '';
+            }
         });
 
         document.addEventListener("DOMContentLoaded", function() {
             const voiceGender = "{{ voice_gender }}";
             const language = "{{ language }}";
-    
+
             fetch("/play_greeting", {
                 method: "POST",
                 headers: {
@@ -225,24 +240,22 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Steps for the guide
             const steps = [
                 { element: '#startButton', message: 'This is the start button. Click OK to proceed or Skip to stop.' },
                 { element: '#stop-button', message: 'This is the stop button. Click OK to proceed or Skip to stop.' },
                 { element: '#result', message: 'This is the result section. Click OK to proceed or Skip to stop.' },
                 { element: '#language', message: 'This is where you select the language. Click OK to finish or Skip to stop.' }
             ];
-        
+
             let currentStep = 0;
-        
+
             function showGuide(stepIndex) {
                 if (stepIndex >= steps.length) return;
-        
+
                 const step = steps[stepIndex];
                 const element = document.querySelector(step.element);
-        
+
                 if (element) {
-                    // Create the modal
                     const modal = document.createElement('div');
                     modal.className = 'guide-modal';
                     modal.innerHTML = `
@@ -252,62 +265,26 @@
                             <button id="guide-skip">Skip</button>
                         </div>
                     `;
-        
+
                     document.body.appendChild(modal);
-        
+
                     const rect = element.getBoundingClientRect();
                     modal.style.top = `${rect.top + window.scrollY + 20}px`;
                     modal.style.left = `${rect.left + window.scrollX + 20}px`;
-        
+
                     document.getElementById('guide-ok').onclick = function() {
                         document.body.removeChild(modal);
                         showGuide(stepIndex + 1);
                     };
-        
+
                     document.getElementById('guide-skip').onclick = function() {
                         document.body.removeChild(modal);
                     };
                 }
             }
-        
+
             showGuide(currentStep);
         });
-        
-        document.addEventListener('DOMContentLoaded', (event) => {
-            const stopButton = document.getElementById('stop-button');
-            const resultSection = document.getElementById('result-section');
-            const suggestionsList = document.getElementById('suggestions-list');
-        
-            stopButton.addEventListener('click', () => {
-                // Prevent default behavior
-                event.preventDefault();
-        
-                // Perform the actions you need
-                stopTextToSpeech();
-                clearResultSection();
-                clearSuggestions();
-        
-                // Optionally, you can also log a message to ensure it's working
-                console.log('Stop button clicked and actions performed.');
-            });
-        
-            function stopTextToSpeech() {
-                // Implement the logic to stop text-to-speech
-                // For example, if you have a global speechSynthesis instance:
-                if (window.speechSynthesis.speaking) {
-                    window.speechSynthesis.cancel();
-                }
-            }
-        
-            function clearResultSection() {
-                resultSection.innerHTML = ''; // Clear the content of the result section
-            }
-        
-            function clearSuggestions() {
-                suggestionsList.innerHTML = ''; // Clear the content of the suggestions list
-            }
-        });
-       
     </script>
 </body>
 </html>

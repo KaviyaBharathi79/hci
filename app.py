@@ -6,23 +6,18 @@ import tensorflow as tf
 from tensorflow.python.keras.models import model_from_json
 from tensorflow.keras.preprocessing import image
 import numpy as np
-from spellchecker import SpellChecker
-import re
-from collections import Counter
-from fuzzywuzzy import fuzz
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Set a secret key for session management
 camera = cv2.VideoCapture(0)
 
 # Mapping for prediction
-d = {0: ' ', 1: 'A', 2: 'B', 3: 'C',
-     4: 'D', 5: 'E', 6: 'F', 7: 'G',
-     8: 'H', 9: 'I', 10: 'J', 11: 'K',
-     12: 'L', 13: 'M', 14: 'N', 15: 'O',
-     16: 'P', 17: 'Q', 18: 'R', 19: 'S',
-     20: 'T', 21: 'U', 22: 'V', 23: 'W',
-     24: 'X', 25: 'Y', 26: 'Z'}
+d = {0: ' ', 1: 'Acting', 2: 'Bathing', 3: 'Catch',
+     4: 'doctor', 5: 'elephant', 6: 'father', 7: 'goat',
+     8: 'hat', 9: 'Ink', 10: 'Jack', 11: 'Kaviya',
+     12: 'love', 13: 'quick', 18: 'rat', 19: 'say',
+     20: 'Tittle', 21: 'Uncle', 22: 'Vicky', 23: 'Watch',
+     24: 'Xerox', 25: 'Yak', 26: 'Zebra'}
 
 # Coordinates for the gesture recognition window
 upper_left = (335, 3)
@@ -33,17 +28,6 @@ with open('model-bw.json', 'r') as json_file:
     loaded_model_json = json_file.read()
 loaded_model = model_from_json(loaded_model_json)
 loaded_model.load_weights("model-bw.h5")
-
-# Autocorrect and word probability data
-words = []
-with open('autocorrect book.txt', 'r', encoding='utf-8') as f:
-    data = f.read().lower()
-    words = re.findall('\w+', data)
-    words += words
-
-words_freq_dict = Counter(words)
-Total = sum(words_freq_dict.values())
-probs = {k: words_freq_dict[k] / Total for k in words_freq_dict.keys()}
 
 # Function to process the image for gesture recognition
 def function(img):
@@ -93,6 +77,7 @@ def set_language():
 # Route for prediction
 @app.route('/predict', methods=['POST'])
 def predictions():
+    global l, str1  # Make sure we are using the global variables
     success, frame = camera.read()
     if not success:
         return jsonify({'error': 'Failed to capture image from camera'}), 500
@@ -114,34 +99,37 @@ def predictions():
     a = d[p_test]
     l.append(a)
     str1 = "".join(l)
-    autocorrected_text = autocorrect_text(str1)
-    similar_words = get_similar(autocorrected_text)
 
     return jsonify({
         'success': True,
         'pred': str1,
-        'autocorrect': autocorrected_text,
-        'similar_words': similar_words
     })
 
 # Route to stop prediction and perform text-to-speech
 @app.route('/stop', methods=['POST'])
 def stopping():
-    global l  # Declare l as global to modify it within this function
+    global l, str1  # Declare l and str1 as global to modify them within this function
     voice_gender = session.get('voice_gender', 'Female')
     language = session.get('language', 'en')
 
-    # Combine the detected letters into a word
-    str1 = "".join(l)
+    # Combine the detected gestures into a word
+    str1 = "".join(l)  # Update str1 with the combined string from list l
 
     # Perform text-to-speech on the final word
     if str1.strip():  # Only proceed if there's a word to announce
-        text_to_speech(autocorrect_text(str1), voice_gender, language)
+        text_to_speech(str1, voice_gender, language)
 
-    # Clear the prediction result
-    l.clear()
+    # Clear the prediction list and the final word string
+    l.clear()  # Clear the list to reset predictions
+    str1 = ""  # Clear the string to reset the displayed word
 
-    return render_template("index.html", pred="", voice_gender=voice_gender)
+    # Return a JSON response with the cleared prediction
+    return jsonify({
+        'success': True,
+        'message': 'Stopped prediction and performed text-to-speech.',
+        'pred': ""  # Clear the result display
+    })
+
 
 # Route for homepage
 @app.route('/')
@@ -167,31 +155,6 @@ def play_greeting():
 @app.route('/video')
 def video():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-# Autocorrect function
-def autocorrect_text(text):
-    spell = SpellChecker()
-    words = text.split()
-    corrected_words = [spell.correction(word) for word in words]
-    corrected_text = ' '.join(corrected_words)
-    return corrected_text
-
-# Function to get similar words based on input keyword
-def get_similar(keyword, top_n=5):
-    if not keyword:
-        return []
-
-    similarities = []
-    for v in words_freq_dict.keys():
-        similarity = fuzz.ratio(keyword, v) / 100.0 if keyword and v else 0
-        similarities.append(similarity)
-
-    df = pd.DataFrame.from_dict(probs, orient='index').reset_index()
-    df.columns = ['Word', 'Prob']
-    df['Similarity'] = similarities
-    suggestions = df.sort_values(['Similarity', 'Prob'], ascending=False)[['Word', 'Similarity']]
-    suggestions_list = suggestions.head(top_n).to_dict('records')
-    return suggestions_list
 
 if __name__ == "__main__":
     app.run(debug=True)
