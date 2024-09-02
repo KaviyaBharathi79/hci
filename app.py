@@ -130,6 +130,18 @@ def stopping():
         'pred': ""  # Clear the result display
     })
 
+#route for clear
+@app.route('/clear', methods=['POST'])
+def clear():
+    global l, str1  # Declare l and str1 as global to modify them within this function
+    l.clear()  # Clear the list to reset predictions
+    str1 = ""  # Clear the string to reset the displayed word
+    return jsonify({
+        'success': True,
+        'message': 'Cleared the prediction.',
+        'pred': ""  # Clear the result display
+    })
+
 
 # Route for homepage
 @app.route('/')

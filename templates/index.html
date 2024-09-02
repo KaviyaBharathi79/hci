@@ -143,11 +143,12 @@
     </div>
     <div class="container">
         <form id="start-form" action='/predict' method='post'>
-            <button type="submit" name="start" value="start" class="button1" id="startButton">Start</button>
+            <button type="submit" name="start" value="start" class="button1" id="startButton">Start capture</button>
         </form>
         <form id="stop-form" action='/stop' method='post'>
-            <button type="submit" name="stop" value="stop" class="button2" id="stop-button">Stop</button>
+            <button type="submit" name="stop" value="stop" class="button2" id="stop-button">Translate</button>
         </form>
+        <button id="clear-button" onclick="clearPrediction()">Clear</button>
     </div>
 
     <script>
@@ -285,6 +286,20 @@
 
             showGuide(currentStep);
         });
+
+        function clearPrediction() {
+        fetch('/clear', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('result').textContent = ""; // Clear the displayed prediction
+            }
+        });
+    }
+    
+
     </script>
 </body>
 </html>
