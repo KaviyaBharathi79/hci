@@ -197,6 +197,11 @@
             stopButton.addEventListener('click', function (e) {
                 e.preventDefault();
 
+                if (resultElement.innerText.trim() === '') {
+                    alert("Start capture first!");
+                    return; // Exit the function if the result is empty
+                }
+
                 fetch('/stop', {
                     method: 'POST',
                 })
@@ -288,18 +293,16 @@
         });
 
         function clearPrediction() {
-        fetch('/clear', {
-            method: 'POST',
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('result').textContent = ""; // Clear the displayed prediction
-            }
-        });
-    }
-    
-
+            fetch('/clear', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('result').textContent = ""; // Clear the displayed prediction
+                }
+            });
+        }
     </script>
 </body>
 </html>
